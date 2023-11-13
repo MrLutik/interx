@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	sdkmath "cosmossdk.io/math"
 	"github.com/KiraCore/interx/common"
 	"github.com/KiraCore/interx/config"
 	"github.com/KiraCore/interx/tasks"
@@ -32,7 +31,7 @@ type Undelegation struct {
 		ValKey  string `json:"valkey,omitempty"`
 		Logo    string `json:"logo,omitempty"`
 	} `json:"validator_info"`
-	Tokens sdk.Coins `json:"tokens,omitempty"`
+	Tokens sdk.Coins `json:"tokens"`
 	Expiry string    `json:"expiry,omitempty"`
 }
 
@@ -187,12 +186,17 @@ func queryUndelegationsHandler(r *http.Request, gwCosmosmux *runtime.ServeMux) (
 	if success != nil {
 		result := types.QueryUndelegationsResult{}
 
+		fmt.Println("response data :", success)
+
 		// parse user balance data and generate delegation responses from pool tokens
 		byteData, err := json.Marshal(success)
 		if err != nil {
 			common.GetLogger().Error("[query-undelegations] Invalid response format", err)
 			return common.ServeError(0, "", err.Error(), http.StatusInternalServerError)
 		}
+
+		fmt.Println("response data :", byteData)
+
 		err = json.Unmarshal(byteData, &result)
 		if err != nil {
 			common.GetLogger().Error("[query-undelegations] Invalid response format", err)
@@ -218,15 +222,8 @@ func queryUndelegationsHandler(r *http.Request, gwCosmosmux *runtime.ServeMux) (
 			undelegationData.Expiry = undelegation.Expiry
 
 			for _, token := range undelegation.Amount {
-				tokenData := sdk.Coin{}
-				tokenData.Denom = strings.Split(strings.Split(token, "\n\u0004")[1], "\u0012\u0003")[0]
-				tokenData.Amount, found = sdkmath.NewIntFromString(strings.Split(strings.Split(token, "\n\u0004")[1], "\u0012\u0003")[1])
-				if !found {
-					break
-				}
-				undelegationData.Tokens = append(undelegationData.Tokens, tokenData)
+				undelegationData.Tokens = append(undelegationData.Tokens, parseCoinString(token))
 			}
-			// undelegationData.Tokens = undelegation.Amount
 
 			response.Undelegations = append(response.Undelegations, undelegationData)
 		}
