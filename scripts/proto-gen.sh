@@ -151,26 +151,19 @@ SEKAI_BRANCH=$(grep -Fn -m 1 'SekaiVersion ' $CONSTANS_FILE | rev | cut -d "=" -
 ($(isNullOrEmpty "$COSMOS_BRANCH")) && ( echoErr "ERROR: CosmosVersion was NOT found in contants '$CONSTANS_FILE' !" && sleep 5 && exit 1 )
 ($(isNullOrEmpty "$SEKAI_BRANCH")) && ( echoErr "ERROR: SekaiVersion was NOT found in contants '$CONSTANS_FILE' !" && sleep 5 && exit 1 )
 
-go get github.com/KiraCore/sekai@$SEKAI_BRANCH
 go get github.com/cosmos/cosmos-sdk@$COSMOS_BRANCH
 
 echoInfo "Cleaning up proto gen files..."
 rm -rfv ./proto-gen
+mkdir -p ./proto-gen
 mkdir -p ./proto-gen ./proto
-kira_dir=$(go list -f '{{ .Dir }}' -m github.com/KiraCore/sekai@$SEKAI_BRANCH)
 cosmos_sdk_dir=$(go list -f '{{ .Dir }}' -m github.com/cosmos/cosmos-sdk@$COSMOS_BRANCH)
 
-rm -rfv ./proto/cosmos ./proto/kira ./third_party/proto
+rm -rfv ./third_party/proto ./proto/cosmos ./proto/kira
 mkdir -p ./third_party/proto
 cp -rfv $cosmos_sdk_dir/proto/cosmos ./proto
-rm -rfv ./proto/cosmos/app
-rm -rfv ./proto/cosmos/orm
-rm -rfv ./proto/cosmos/reflection
-rm -rfv ./proto/cosmos/tx
 cp -rfv $cosmos_sdk_dir/proto/amino ./proto
-tar -C ./third_party/ -xvf ./cosmos_proto.tar.xz
-# cp -rfv $cosmos_sdk_dir/third_party/proto/* ./third_party/proto
-# cp -rfv $kira_dir/proto/kira ./proto
+tar -C ./third_party/ -xvf ./third_party_cosmos_proto.tar.xz
 
 wget https://github.com/KiraCore/sekai/releases/download/$SEKAI_BRANCH/source-code.tar.gz
 mkdir -p sekai
@@ -183,7 +176,7 @@ rm -rfv ./sekai
 rm -rfv ./codec && mkdir -p codec/types
 buf protoc -I "third_party/proto" --gogotypes_out=./codec/types third_party/proto/google/protobuf/any.proto
 mv codec/types/google.golang.org/protobuf/types/known/anypb/any.pb.go codec/types
-rm -rfv codec/types/third_party
+rm -rfv codec/types/google.golang.org/protobuf/types/known/anypb
 rm -rfv ./third_party/proto/gogoproto
 rm -rfv ./third_party/proto/google
 ###
@@ -216,7 +209,7 @@ echoInfo "Generating protobuf files..."
 for dir in $proto_dirs; do
     proto_fils=$(find "${dir}" -maxdepth 1 -name '*.proto') 
     for fil in $proto_fils; do
-        if [[ "$fil" != *module* ]]; then
+        if grep -q "option go_package" "$fil"; then
             buf protoc \
             -I "./proto" \
             -I third_party/grpc-gateway/ \

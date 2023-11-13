@@ -2,6 +2,7 @@ package kira
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"net/http"
 	"regexp"
@@ -20,6 +21,26 @@ import (
 type QueryStakingPoolDelegatorsResponse struct {
 	Pool       types.ValidatorPool `json:"pool"`
 	Delegators []string            `json:"delegators,omitempty"`
+}
+
+type Undelegation struct {
+	ID            int `json:"id,omitempty"`
+	ValidatorInfo struct {
+		Moniker string `json:"moniker,omitempty"`
+		Address string `json:"address,omitempty"`
+		ValKey  string `json:"valkey,omitempty"`
+		Logo    string `json:"logo,omitempty"`
+	} `json:"validator_info"`
+	Tokens sdk.Coins `json:"tokens,omitempty"`
+	Expiry string    `json:"expiry,omitempty"`
+}
+
+// QueryDelegationsResponse is a struct to be used for query delegations response
+type QueryUndelegationsResponse struct {
+	Undelegations []Undelegation `json:"undelegations"`
+	Pagination    struct {
+		Total int `json:"total,string,omitempty"`
+	} `json:"pagination,omitempty"`
 }
 
 type QueryBalancesResponse struct {
@@ -130,18 +151,142 @@ func QueryStakingPoolRequest(gwCosmosmux *runtime.ServeMux, rpcAddr string) http
 	}
 }
 
+func findValidator(address string) (types.QueryValidator, bool) {
+	for _, validator := range tasks.AllValidators.Validators {
+		if validator.Valkey == address {
+			return validator, true
+		}
+	}
+	return types.QueryValidator{}, false
+}
+
 // queryUndelegationsHandler is a function to query all undelegations for a delegator
 func queryUndelegationsHandler(r *http.Request, gwCosmosmux *runtime.ServeMux) (interface{}, interface{}, int) {
 	queries := r.URL.Query()
 	account := queries["undelegatorAddress"]
+	offset := queries["offset"]
+	limit := queries["limit"]
+	countTotal := queries["count_total"]
+	response := QueryUndelegationsResponse{}
 
 	if len(account) == 0 {
-		common.GetLogger().Error("[query-undelegations] 'delegator address' is not set")
+		common.GetLogger().Error("[query-undelegations] 'undelegator address' is not set")
 		return common.ServeError(0, "'delegator address' is not set", "", http.StatusBadRequest)
 	}
 
+	var events = make([]string, 0, 1)
+	if len(account) == 1 {
+		events = append(events, fmt.Sprintf("delegator=%s", account[0]))
+	}
+
+	r.URL.RawQuery = strings.Join(events, "&")
+
 	r.URL.Path = strings.Replace(r.URL.Path, "/api/kira/undelegations", "/kira/multistaking/v1beta1/undelegations", -1)
-	return common.ServeGRPC(r, gwCosmosmux)
+	success, failure, status := common.ServeGRPC(r, gwCosmosmux)
+	if success != nil {
+		result := types.QueryUndelegationsResult{}
+
+		// parse user balance data and generate delegation responses from pool tokens
+		byteData, err := json.Marshal(success)
+		if err != nil {
+			common.GetLogger().Error("[query-undelegations] Invalid response format", err)
+			return common.ServeError(0, "", err.Error(), http.StatusInternalServerError)
+		}
+		err = json.Unmarshal(byteData, &result)
+		if err != nil {
+			common.GetLogger().Error("[query-undelegations] Invalid response format", err)
+			return common.ServeError(0, "", err.Error(), http.StatusInternalServerError)
+		}
+
+		for _, undelegation := range result.Undelegations {
+			fmt.Println("undelegation member: ", undelegation)
+			undelegationData := Undelegation{}
+			validator, found := findValidator(undelegation.ValAddress)
+
+			fmt.Println("undelegation val info: ", validator, found)
+			if !found {
+				continue
+			}
+
+			undelegationData.ID = int(undelegation.ID)
+
+			undelegationData.ValidatorInfo.Logo = validator.Logo
+			undelegationData.ValidatorInfo.Moniker = validator.Moniker
+			undelegationData.ValidatorInfo.ValKey = validator.Valkey
+			undelegationData.Expiry = undelegation.Expiry
+
+			// for _, token := range undelegation.Amount {
+			// 	tokenData := sdk.Coin{}
+			// 	tokenData.Denom = strings.Split(strings.Split(token, "\n\u0004")[1], "\u0012\u0003")[0]
+			// 	tokenData.Amount, found = sdkmath.NewIntFromString(strings.Split(strings.Split(token, "\n\u0004")[1], "\u0012\u0003")[1])
+			// 	if !found {
+			// 		break
+			// 	}
+			// 	undelegationData.Tokens = append(undelegationData.Tokens, tokenData)
+			// }
+			undelegationData.Tokens = undelegation.Amount
+
+			response.Undelegations = append(response.Undelegations, undelegationData)
+		}
+
+		// apply pagination
+		from := 0
+		total := len(response.Undelegations)
+		count := int(math.Min(float64(50), float64(total)))
+		if len(countTotal) == 1 && countTotal[0] == "true" {
+			response.Pagination.Total = total
+		}
+		if len(offset) == 1 {
+			from, err = strconv.Atoi(offset[0])
+			if err != nil {
+				common.GetLogger().Error("[query-undelegation] Failed to parse parameter 'offset': ", err)
+				return common.ServeError(0, "failed to parse parameter 'offset'", err.Error(), http.StatusBadRequest)
+			}
+		}
+		if len(limit) == 1 {
+			count, err = strconv.Atoi(limit[0])
+			if err != nil {
+				common.GetLogger().Error("[query-undelegation] Failed to parse parameter 'limit': ", err)
+				return common.ServeError(0, "failed to parse parameter 'limit'", err.Error(), http.StatusBadRequest)
+			}
+		}
+
+		from = int(math.Min(float64(from), float64(total)))
+		to := int(math.Min(float64(from+count), float64(total)))
+		response.Undelegations = response.Undelegations[from:to]
+		success = response
+	}
+
+	return success, failure, status
+}
+
+func QueryUndelegationsRequest(gwCosmosmux *runtime.ServeMux, rpcAddr string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var statusCode int
+		request := common.GetInterxRequest(r)
+		response := common.GetResponseFormat(request, rpcAddr)
+
+		common.GetLogger().Info("[query-undelegations] Entering undelegations query")
+
+		if !common.RPCMethods["GET"][config.QueryUndelegations].Enabled {
+			response.Response, response.Error, statusCode = common.ServeError(0, "", "API disabled", http.StatusForbidden)
+		} else {
+			if common.RPCMethods["GET"][config.QueryUndelegations].CachingEnabled {
+				found, cacheResponse, cacheError, cacheStatus := common.SearchCache(request, response)
+				if found {
+					response.Response, response.Error, statusCode = cacheResponse, cacheError, cacheStatus
+					common.WrapResponse(w, request, *response, statusCode, false)
+
+					common.GetLogger().Info("[query-undelegations] Returning from the cache")
+					return
+				}
+			}
+
+			response.Response, response.Error, statusCode = queryUndelegationsHandler(r, gwCosmosmux)
+		}
+
+		common.WrapResponse(w, request, *response, statusCode, common.RPCMethods["GET"][config.QueryUndelegations].CachingEnabled)
+	}
 }
 
 // queryDelegationsHandler is a function to query all delegations for a delegator
@@ -270,34 +415,5 @@ func QueryDelegationsRequest(gwCosmosmux *runtime.ServeMux, rpcAddr string) http
 		}
 
 		common.WrapResponse(w, request, *response, statusCode, common.RPCMethods["GET"][config.QueryDelegations].CachingEnabled)
-	}
-}
-
-func QueryUndelegationsRequest(gwCosmosmux *runtime.ServeMux, rpcAddr string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var statusCode int
-		request := common.GetInterxRequest(r)
-		response := common.GetResponseFormat(request, rpcAddr)
-
-		common.GetLogger().Info("[query-undelegations] Entering undelegations query")
-
-		if !common.RPCMethods["GET"][config.QueryUndelegations].Enabled {
-			response.Response, response.Error, statusCode = common.ServeError(0, "", "API disabled", http.StatusForbidden)
-		} else {
-			if common.RPCMethods["GET"][config.QueryUndelegations].CachingEnabled {
-				found, cacheResponse, cacheError, cacheStatus := common.SearchCache(request, response)
-				if found {
-					response.Response, response.Error, statusCode = cacheResponse, cacheError, cacheStatus
-					common.WrapResponse(w, request, *response, statusCode, false)
-
-					common.GetLogger().Info("[query-staking-pool] Returning from the cache")
-					return
-				}
-			}
-
-			response.Response, response.Error, statusCode = queryUndelegationsHandler(r, gwCosmosmux)
-		}
-
-		common.WrapResponse(w, request, *response, statusCode, common.RPCMethods["GET"][config.QueryUndelegations].CachingEnabled)
 	}
 }
