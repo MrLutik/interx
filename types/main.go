@@ -204,11 +204,11 @@ type QueryValidatorPoolResult struct {
 }
 
 type Undelegation struct {
-	ID         uint64    `json:"id,string"`
-	Address    string    `json:"address"`
-	ValAddress string    `json:"valaddress"`
-	Expiry     string    `json:"expiry"`
-	Amount     sdk.Coins `json:"amount"`
+	ID         uint64   `json:"id,string"`
+	Address    string   `json:"address"`
+	ValAddress string   `json:"valaddress"`
+	Expiry     string   `json:"expiry"`
+	Amount     []string `json:"amount"`
 }
 
 // QueryDelegationsResult is a struct to be used for query delegations response

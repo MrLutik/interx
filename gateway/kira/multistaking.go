@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	sdkmath "cosmossdk.io/math"
 	"github.com/KiraCore/interx/common"
 	"github.com/KiraCore/interx/config"
 	"github.com/KiraCore/interx/tasks"
@@ -210,21 +211,22 @@ func queryUndelegationsHandler(r *http.Request, gwCosmosmux *runtime.ServeMux) (
 
 			undelegationData.ID = int(undelegation.ID)
 
+			undelegationData.ValidatorInfo.Address = validator.Address
 			undelegationData.ValidatorInfo.Logo = validator.Logo
 			undelegationData.ValidatorInfo.Moniker = validator.Moniker
 			undelegationData.ValidatorInfo.ValKey = validator.Valkey
 			undelegationData.Expiry = undelegation.Expiry
 
-			// for _, token := range undelegation.Amount {
-			// 	tokenData := sdk.Coin{}
-			// 	tokenData.Denom = strings.Split(strings.Split(token, "\n\u0004")[1], "\u0012\u0003")[0]
-			// 	tokenData.Amount, found = sdkmath.NewIntFromString(strings.Split(strings.Split(token, "\n\u0004")[1], "\u0012\u0003")[1])
-			// 	if !found {
-			// 		break
-			// 	}
-			// 	undelegationData.Tokens = append(undelegationData.Tokens, tokenData)
-			// }
-			undelegationData.Tokens = undelegation.Amount
+			for _, token := range undelegation.Amount {
+				tokenData := sdk.Coin{}
+				tokenData.Denom = strings.Split(strings.Split(token, "\n\u0004")[1], "\u0012\u0003")[0]
+				tokenData.Amount, found = sdkmath.NewIntFromString(strings.Split(strings.Split(token, "\n\u0004")[1], "\u0012\u0003")[1])
+				if !found {
+					break
+				}
+				undelegationData.Tokens = append(undelegationData.Tokens, tokenData)
+			}
+			// undelegationData.Tokens = undelegation.Amount
 
 			response.Undelegations = append(response.Undelegations, undelegationData)
 		}
