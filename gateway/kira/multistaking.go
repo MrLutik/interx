@@ -186,16 +186,12 @@ func queryUndelegationsHandler(r *http.Request, gwCosmosmux *runtime.ServeMux) (
 	if success != nil {
 		result := types.QueryUndelegationsResult{}
 
-		fmt.Println("response data :", success)
-
 		// parse user balance data and generate delegation responses from pool tokens
 		byteData, err := json.Marshal(success)
 		if err != nil {
 			common.GetLogger().Error("[query-undelegations] Invalid response format", err)
 			return common.ServeError(0, "", err.Error(), http.StatusInternalServerError)
 		}
-
-		fmt.Println("response data :", byteData)
 
 		err = json.Unmarshal(byteData, &result)
 		if err != nil {
@@ -204,11 +200,9 @@ func queryUndelegationsHandler(r *http.Request, gwCosmosmux *runtime.ServeMux) (
 		}
 
 		for _, undelegation := range result.Undelegations {
-			fmt.Println("undelegation member: ", undelegation)
 			undelegationData := Undelegation{}
 			validator, found := findValidator(undelegation.ValAddress)
 
-			fmt.Println("undelegation val info: ", validator, found)
 			if !found {
 				continue
 			}
