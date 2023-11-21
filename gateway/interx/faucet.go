@@ -159,7 +159,7 @@ func serveFaucet(r *http.Request, gwCosmosmux *runtime.ServeMux, request types.I
 	msgs := []sdk.Msg{msgSend}
 	fee := legacytx.NewStdFee(200000, sdk.NewCoins(feeAmount)) //Fee handling
 	memo := "Faucet Transfer"
-	tip := &tx.Tip{Amount: msgSend.Amount, Tipper: ""}
+	tip := &tx.Tip{Amount: msgSend.Amount, Tipper: "test"}
 
 	sigs := make([]legacytx.StdSignature, 1)
 	signBytes := legacytx.StdSignBytes(common.NodeStatus.Chainid, accountNumber, sequence, 0, fee, msgs, memo, tip)
