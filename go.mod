@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/KeisukeYamashita/go-jsonrpc v1.0.1
-	github.com/KiraCore/sekai v0.3.36
+	github.com/KiraCore/sekai v0.3.38
 	github.com/btcsuite/btcd v0.22.1
 	github.com/cometbft/cometbft v0.37.2
 	github.com/cosmos/cosmos-proto v1.0.0-beta.2

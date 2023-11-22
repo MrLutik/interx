@@ -2,4 +2,4 @@
 Features:
 
 * Implement QueryUndelegations endpoint
-* Bump sekai version to v0.3.36
+* Bump sekai version to v0.3.38
