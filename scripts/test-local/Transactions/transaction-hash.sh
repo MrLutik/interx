@@ -12,8 +12,9 @@ addAccount testuser8
 TESTUSER_ADDRESS=$(showAddress testuser8)
 
 TXRESULT=$(sekaid tx bank send validator $TESTUSER_ADDRESS 5ukex --keyring-backend=test --chain-id=$NETWORK_NAME --fees 100ukex --broadcast-mode=async --output=json --yes --home=$SEKAID_HOME 2> /dev/null || exit 1)
-TX_ID=$(echo $TXRESULT | jsonQuickParse "txhash")
-BLOCK_HEIGHT=$(echo $TXRESULT | jsonQuickParse "height")
+TX_HASH=$(echo $TXRESULT | jsonQuickParse "txhash")
+TXQUERYRESULT=$(sekaid query tx $TX_ID 2> /dev/null || exit 1)
+BLOCK_HEIGHT=$(echo $TXQUERYRESULT | jsonQuickParse "height")
 echo $TX_ID
 echo $BLOCK_HEIGHT
 

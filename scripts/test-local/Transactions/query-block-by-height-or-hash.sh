@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# To run test locally: make network-start && ./scripts/test-local/account-balances.sh
+# To run test locally: make network-start && ./scripts/test-local/Transactions/query-block-by-height-or-hash.sh
 set -e
 set -x
 . /etc/profile
@@ -11,8 +11,10 @@ VALIDATOR_ADDRESS=$(showAddress validator)
 addAccount testuser2
 TESTUSER_ADDRESS=$(showAddress testuser2)
 
-BLOCK_HEIGHT=$(sekaid tx bank send validator $TESTUSER_ADDRESS 5ukex --keyring-backend=test --chain-id=$NETWORK_NAME --fees 100ukex --broadcast-mode=async --output=json --yes --home=$SEKAID_HOME | jsonQuickParse "height" 2> /dev/null || exit 1)
-BLOCK_HASH=$(sekaid query block $BLOCK_HEIGHT | jq '.block_id.hash' | tr -d '"')
+TXRESULT=$(sekaid tx bank send validator $TESTUSER_ADDRESS 5ukex --keyring-backend=test --chain-id=$NETWORK_NAME --fees 100ukex --broadcast-mode=async --output=json --yes --home=$SEKAID_HOME 2> /dev/null || exit 1)
+BLOCK_HASH=$(echo $TXRESULT | jsonQuickParse "txhash")
+TXQUERYRESULT=$(sekaid query tx $TX_ID 2> /dev/null || exit 1)
+BLOCK_HEIGHT=$(echo $TXQUERYRESULT | jsonQuickParse "height")
 
 INTERX_GATEWAY="127.0.0.1:11000"
 RESULT_HASH_FROM_INTERX=$(curl --fail $INTERX_GATEWAY/api/blocks/$BLOCK_HEIGHT | jq '.block_id.hash' | tr -d '"' || exit 1)
