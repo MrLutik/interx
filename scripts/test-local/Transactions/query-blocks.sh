@@ -13,7 +13,8 @@ TESTUSER_ADDRESS=$(showAddress testuser4)
 
 TXRESULT=$(sekaid tx bank send validator $TESTUSER_ADDRESS 5ukex --keyring-backend=test --chain-id=$NETWORK_NAME --fees 100ukex --broadcast-mode=async --output=json --yes --home=$SEKAID_HOME 2> /dev/null || exit 1)
 TX_ID=$(echo $TXRESULT | jsonQuickParse "txhash")
-TXQUERYRESULT=$(sekaid query tx $TX_ID 2> /dev/null || exit 1)
+sleep 5
+TXQUERYRESULT=$(sekaid query tx $TX_ID --chain-id=$NETWORK_NAME --output=json --home=$SEKAID_HOME 2> /dev/null || exit 1)
 BLOCK_HEIGHT=$(echo $TXQUERYRESULT | jsonQuickParse "height")
 
 INTERX_GATEWAY="127.0.0.1:11000"
