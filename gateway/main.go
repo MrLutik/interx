@@ -14,6 +14,7 @@ import (
 	cosmosAuth "github.com/KiraCore/interx/proto-gen/cosmos/auth/v1beta1"
 	cosmosBank "github.com/KiraCore/interx/proto-gen/cosmos/bank/v1beta1"
 	kiraGov "github.com/KiraCore/interx/proto-gen/kira/gov"
+	kiraMultiStaking "github.com/KiraCore/interx/proto-gen/kira/multistaking"
 	kiraSlashing "github.com/KiraCore/interx/proto-gen/kira/slashing/v1beta1"
 	kiraSpending "github.com/KiraCore/interx/proto-gen/kira/spending"
 	kiraStaking "github.com/KiraCore/interx/proto-gen/kira/staking"
@@ -70,6 +71,7 @@ func GetGrpcServeMux(grpcAddr string) (*runtime.ServeMux, error) {
 	}
 
 	gwCosmosmux := runtime.NewServeMux()
+
 	err = cosmosBank.RegisterQueryHandler(context.Background(), gwCosmosmux, conn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register gateway: %w", err)
@@ -86,6 +88,11 @@ func GetGrpcServeMux(grpcAddr string) (*runtime.ServeMux, error) {
 	}
 
 	err = kiraStaking.RegisterQueryHandler(context.Background(), gwCosmosmux, conn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register gateway: %w", err)
+	}
+
+	err = kiraMultiStaking.RegisterQueryHandler(context.Background(), gwCosmosmux, conn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register gateway: %w", err)
 	}
@@ -160,6 +167,7 @@ func Run(configFilePath string, log grpclog.LoggerV2) error {
 		Handler: c.Handler(router),
 	}
 
+	config.LoadAddressAndDenom(configFilePath, gwCosmosmux, rpcAddr, gatewayAddr)
 	tasks.RunTasks(gwCosmosmux, rpcAddr, gatewayAddr)
 
 	if serveHTTPS {

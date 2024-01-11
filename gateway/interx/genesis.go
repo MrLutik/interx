@@ -10,10 +10,10 @@ import (
 	"github.com/KiraCore/interx/common"
 	"github.com/KiraCore/interx/config"
 	"github.com/KiraCore/interx/global"
+	tmjson "github.com/cometbft/cometbft/libs/json"
+	tmtypes "github.com/cometbft/cometbft/types"
 	"github.com/gorilla/mux"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	tmjson "github.com/tendermint/tendermint/libs/json"
-	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 // RegisterGenesisQueryRoutes registers genesis query routers.
@@ -141,7 +141,6 @@ func QueryGenesis(rpcAddr string) http.HandlerFunc {
 		request := common.GetInterxRequest(r)
 		response := common.GetResponseFormat(request, rpcAddr)
 
-		fmt.Println(genesisPath())
 		if saveGenesis(rpcAddr) != nil {
 			response.Response, response.Error, statusCode = common.ServeError(0, "", "interx error", http.StatusInternalServerError)
 			common.WrapResponse(w, request, *response, statusCode, false)

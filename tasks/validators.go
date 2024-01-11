@@ -19,7 +19,11 @@ import (
 )
 
 var (
-	AllValidators types.AllValidators
+	AllValidators   types.AllValidators
+	PoolTokens      []string                       = make([]string, 0)
+	AllPools        map[int64]types.ValidatorPool  = make(map[int64]types.ValidatorPool)
+	AddrToValidator map[string]string              = make(map[string]string)
+	PoolToValidator map[int64]types.QueryValidator = make(map[int64]types.QueryValidator)
 )
 
 const (
@@ -45,6 +49,7 @@ func ToString(data interface{}) string {
 }
 
 func QueryValidators(gwCosmosmux *runtime.ServeMux, gatewayAddr string) error {
+	// Query validators
 	type ValidatorsResponse = struct {
 		Validators []types.QueryValidator `json:"validators,omitempty"`
 		Actors     []string               `json:"actors,omitempty"`
@@ -85,6 +90,31 @@ func QueryValidators(gwCosmosmux *runtime.ServeMux, gatewayAddr string) error {
 		offset += limit
 	}
 
+	// Query tokens available to stake in validator pools
+	type TokenRatesResponse struct {
+		Data []types.TokenRate `json:"data"`
+	}
+	tokenRatesResponse := TokenRatesResponse{}
+	tokenRatesQueryRequest, _ := http.NewRequest("GET", "http://"+gatewayAddr+"/kira/tokens/rates", nil)
+	tokenRatesQueryResponse, _, _ := common.ServeGRPC(tokenRatesQueryRequest, gwCosmosmux)
+	if tokenRatesQueryResponse != nil {
+		byteData, err := json.Marshal(tokenRatesQueryResponse)
+		if err != nil {
+			return err
+		}
+
+		err = json.Unmarshal(byteData, &tokenRatesResponse)
+		if err != nil {
+			return err
+		}
+
+		PoolTokens = []string{}
+		for _, tokenRate := range tokenRatesResponse.Data {
+			PoolTokens = append(PoolTokens, tokenRate.Denom)
+		}
+	}
+
+	// Query validator signing infos
 	type ValidatorInfoResponse = struct {
 		ValValidatorInfos []types.ValidatorSigningInfo `json:"info,omitempty"`
 	}
@@ -120,14 +150,40 @@ func QueryValidators(gwCosmosmux *runtime.ServeMux, gatewayAddr string) error {
 		offset += limit
 	}
 
-	for index, validator := range result.Validators {
+	// Query validator pools
+	type ValidatorPoolsResponse struct {
+		Pools []types.ValidatorPool `json:"pools,omitempty"`
+	}
 
+	valToPool := make(map[string]types.ValidatorPool)
+	stakingPoolsQueryRequest, _ := http.NewRequest("GET", "http://"+gatewayAddr+"/kira/multistaking/v1beta1/staking_pools", nil)
+	stakingPoolsQueryResponse, _, _ := common.ServeGRPC(stakingPoolsQueryRequest, gwCosmosmux)
+	if stakingPoolsQueryResponse != nil {
+		byteData, err := json.Marshal(stakingPoolsQueryResponse)
+		if err != nil {
+			return err
+		}
+
+		pools := ValidatorPoolsResponse{}
+		err = json.Unmarshal(byteData, &pools)
+		if err != nil {
+			return err
+		}
+
+		for _, pool := range pools.Pools {
+			valToPool[pool.Validator] = pool
+			AllPools[pool.ID] = pool
+		}
+	}
+
+	for index, validator := range result.Validators {
 		pubkeyHexString := validator.Pubkey[14 : len(validator.Pubkey)-1]
 		bytes, _ := hex.DecodeString(pubkeyHexString)
 		pubkey := ed25519.PubKey{
 			Key: bytes,
 		}
 		address := sdk.ConsAddress(pubkey.Address()).String()
+		AddrToValidator[validator.Address] = validator.Valkey
 
 		var valSigningInfo types.ValidatorSigningInfo
 		for _, signingInfo := range validatorInfosResponse.ValValidatorInfos {
@@ -163,6 +219,16 @@ func QueryValidators(gwCosmosmux *runtime.ServeMux, gatewayAddr string) error {
 		result.Validators[index].LastPresentBlock = valSigningInfo.LastPresentBlock
 		result.Validators[index].MissedBlocksCounter = valSigningInfo.MissedBlocksCounter
 		result.Validators[index].ProducedBlocksCounter = valSigningInfo.ProducedBlocksCounter
+		pool, found := valToPool[validator.Valkey]
+		if found {
+			result.Validators[index].StakingPoolId = pool.ID
+			if pool.Enabled {
+				result.Validators[index].StakingPoolStatus = "ENABLED"
+			} else {
+				result.Validators[index].StakingPoolStatus = "DISABLED"
+			}
+			PoolToValidator[result.Validators[index].StakingPoolId] = result.Validators[index]
+		}
 	}
 
 	sort.Sort(types.QueryValidators(result.Validators))

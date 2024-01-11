@@ -2,13 +2,12 @@ package kira
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/KiraCore/interx/common"
 	"github.com/KiraCore/interx/config"
+	"github.com/KiraCore/interx/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/gorilla/mux"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -24,7 +23,7 @@ func RegisterKiraTokensRoutes(r *mux.Router, gwCosmosmux *runtime.ServeMux, rpcA
 }
 
 func queryKiraTokensAliasesHandler(r *http.Request, gwCosmosmux *runtime.ServeMux) (interface{}, interface{}, int) {
-	type TokenAliasesResult struct {
+	type TokenAliasesData struct {
 		Decimals int64    `json:"decimals"`
 		Denoms   []string `json:"denoms"`
 		Name     string   `json:"name"`
@@ -32,17 +31,22 @@ func queryKiraTokensAliasesHandler(r *http.Request, gwCosmosmux *runtime.ServeMu
 		Icon     string   `json:"icon"`
 		Amount   sdk.Int  `json:"amount"`
 	}
+	type TokenAliasesResult struct {
+		Data         []TokenAliasesData `json:"token_aliases_data"`
+		DefaultDenom string             `json:"default_denom"`
+		Bech32Prefix string             `json:"bech32_prefix"`
+	}
 
-	tokens := common.GetTokenAliases(gwCosmosmux, r.Clone(r.Context()))
+	tokens, defaultDenom, bech32Prefix := common.GetTokenAliases(gwCosmosmux, r.Clone(r.Context()))
 	tokensSupply := common.GetTokenSupply(gwCosmosmux, r.Clone(r.Context()))
 
-	result := make([]TokenAliasesResult, 0)
+	data := make([]TokenAliasesData, 0)
 	for _, token := range tokens {
 		flag := false
 		for _, denom := range token.Denoms {
 			for _, supply := range tokensSupply {
 				if denom == supply.Denom {
-					result = append(result, TokenAliasesResult{
+					data = append(data, TokenAliasesData{
 						Decimals: token.Decimals,
 						Denoms:   token.Denoms,
 						Name:     token.Name,
@@ -59,6 +63,12 @@ func queryKiraTokensAliasesHandler(r *http.Request, gwCosmosmux *runtime.ServeMu
 				break
 			}
 		}
+	}
+
+	result := TokenAliasesResult{
+		Data:         data,
+		DefaultDenom: defaultDenom,
+		Bech32Prefix: bech32Prefix,
 	}
 
 	return result, nil, http.StatusOK
@@ -94,32 +104,13 @@ func QueryKiraTokensAliasesRequest(gwCosmosmux *runtime.ServeMux, rpcAddr string
 	}
 }
 
-func convertRate(rateString string) string {
-	rate, _ := strconv.ParseFloat(rateString, 64)
-	rate = rate / 1000000000000000000.0
-	rateString = fmt.Sprintf("%g", rate)
-	if !strings.Contains(rateString, ".") {
-		rateString = rateString + ".0"
-	}
-	return rateString
-}
-
 func queryKiraTokensRatesHandler(r *http.Request, gwCosmosmux *runtime.ServeMux) (interface{}, interface{}, int) {
 	r.URL.Path = strings.Replace(r.URL.Path, "/api/kira/tokens", "/kira/tokens", -1)
 	success, failure, status := common.ServeGRPC(r, gwCosmosmux)
 
 	if success != nil {
-		type TokenRate struct {
-			Denom       string `json:"denom"`
-			FeePayments bool   `json:"feePayments"`
-			FeeRate     string `json:"feeRate"`
-			StakeCap    string `json:"stakeCap"`
-			StakeMin    string `json:"stakeMin"`
-			StakeToken  bool   `json:"stakeToken"`
-		}
-
 		type TokenRatesResponse struct {
-			Data []TokenRate `json:"data"`
+			Data []types.TokenRate `json:"data"`
 		}
 		result := TokenRatesResponse{}
 
@@ -135,9 +126,9 @@ func queryKiraTokensRatesHandler(r *http.Request, gwCosmosmux *runtime.ServeMux)
 		}
 
 		for index, tokenRate := range result.Data {
-			result.Data[index].FeeRate = convertRate(tokenRate.FeeRate)
-			result.Data[index].StakeCap = convertRate(tokenRate.StakeCap)
-			result.Data[index].StakeMin = convertRate(tokenRate.StakeMin)
+			result.Data[index].FeeRate = common.ConvertRate(tokenRate.FeeRate)
+			result.Data[index].StakeCap = common.ConvertRate(tokenRate.StakeCap)
+			result.Data[index].StakeMin = common.ConvertRate(tokenRate.StakeMin)
 		}
 
 		success = result

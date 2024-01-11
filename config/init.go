@@ -76,6 +76,7 @@ func getRPCSettings() RPCConfig {
 	config.API["GET"][QueryIdentityRecordVerifyRequestsByApprover] = defaultRPCSetting
 	config.API["GET"][QueryAllIdentityRecordVerifyRequests] = defaultRPCSetting
 	config.API["GET"][QuerySpendingPools] = defaultRPCSetting
+	config.API["GET"][QueryStakingPool] = defaultRPCSetting
 	config.API["GET"][QuerySpendingPoolProposals] = defaultRPCSetting
 	config.API["GET"][QueryUBIRecords] = defaultRPCSetting
 
@@ -230,6 +231,7 @@ func InitConfig(
 	nodeDiscoveryTendermintPort string,
 	nodeDiscoveryTimeout string,
 	nodeKey string,
+	snapshotInterval uint64,
 ) {
 	configFromFile := defaultConfig()
 
@@ -288,6 +290,8 @@ func InitConfig(
 		amount := strings.Split(denom_amount, " ")[1]
 		configFromFile.Faucet.FeeAmounts[denom] = amount
 	}
+
+	configFromFile.SnapshotInterval = snapshotInterval
 
 	bytes, err := json.MarshalIndent(&configFromFile, "", "  ")
 	if err != nil {

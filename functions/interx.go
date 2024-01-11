@@ -280,17 +280,12 @@ func RegisterInterxFunctions() {
 			"parameters": {
 				"voter": {
 					"type":        "string",
-					"description": "This represents the kira account address.",
+					"description": "This represents the voter address.",
 					"optional": true
 				},
-				"reverse": {
-					"type":        "bool",
-					"description": "This an option to sort proposals.",
-					"optional": true
-				},
-				"key": {
+				"proposer": {
 					"type":        "string",
-					"description": "This is an option to validators pagination. key is a value returned in PageResponse.next_key to begin querying the next page most efficiently. Only one of offset or key should be set.",
+					"description": "This represents the proposer address.",
 					"optional": true
 				},
 				"offset": {
@@ -303,9 +298,29 @@ func RegisterInterxFunctions() {
 					"description": "This is an option to validators pagination. limit is the total number of results to be returned in the result page. If left empty it will default to a value to be set by each app.",
 					"optional": true
 				},
-				"countTotal": {
+				"status": {
 					"type":        "string",
-					"description": "This is an option to validators pagination. count_total is set to true  to indicate that the result set should include a count of the total number of items available for pagination in UIs. count_total is only respected when offset is used. It is ignored when key is set.",
+					"description": "This represents the proposal statuses(Unknown, Passed, Rejected, RejectedWithVeto, Pending, QuorumNotReached, Enactment, PassedWithExecFailed) separated by comma.",
+					"optional": true
+				},
+				"sort": {
+					"type":        "string",
+					"description": "This represents how the proposal should be sorted(dateASC, dateDESC).",
+					"optional": true
+				},
+				"types": {
+					"type":        "string",
+					"description": "This represents the proposal types separated by comma.",
+					"optional": true
+				},
+				"dateStart": {
+					"type":        "string",
+					"description": "This represents the starting point in timestamp or date(DD/MM/YY) format.",
+					"optional": true
+				},
+				"dateEnd": {
+					"type":        "string",
+					"description": "This represents the ending point in timestamp or date(DD/MM/YY) format.",
 					"optional": true
 				}
 			},
@@ -454,7 +469,7 @@ func RegisterInterxFunctions() {
 				},
 				"type": {
 					"type":        "string",
-					"description": "This represents the transaction type.",
+					"description": "This represents the transaction types separated by comma.",
 					"optional": true
 				},
 				"page": {
@@ -489,12 +504,12 @@ func RegisterInterxFunctions() {
 				},
 				"direction": {
 					"type":        "string",
-					"description": "This represents direction of the transaction(outbound, inbound).",
+					"description": "This represents directions of the transaction(outbound, inbound) separated by comma.",
 					"optional": true
 				},
 				"status": {
 					"type":        "string",
-					"description": "This represents the transaction status(pending, confirmed, failed).",
+					"description": "This represents the transaction statuses(pending, confirmed, failed) separated by comma.",
 					"optional": true
 				},
 				"sort": {
@@ -1578,6 +1593,221 @@ func RegisterInterxFunctions() {
 				},
 				"pagination": {
 					"description": "The pagination response information like total and next_key"
+				}
+			}
+		}`,
+	)
+
+	AddInterxFunction(
+		"QueryStakingPool",
+		config.QueryStakingPool,
+		`{
+			"description": "QueryStakingPool is a function to query a validator's staking pool.",
+			"parameters": {
+				"validatorAddress": {
+					"type":        "string",
+					"description": "This is the validator's address.",
+					"optional": true
+				}
+			},
+			"response": {
+				"id": {
+					"type":        "number",
+					"description": "The pool id"
+				},
+				"commission": {
+					"type":        "number",
+					"description": "The pool's commission rate"
+				},
+				"slashed": {
+					"type":        "number",
+					"description": "The pool's total slashed percentage"
+				},
+				"voting_power": {
+					"type":        "array<string>",
+					"description": "The pool's total delegation tokens"
+				},
+				"total_delegators": {
+					"type":        "number",
+					"description": "Total number of delegators staked into the pool"
+				},
+				"tokens": {
+					"type": 	   "array<string>",
+					"description": "list of token types available to stake in the pool"
+				}
+			}
+		}`,
+	)
+
+	AddInterxFunction(
+		"QueryUndelegations",
+		config.QueryUndelegations,
+		`{
+			"description": "QueryUnelegations is a function to query all undelegation records for a delegator.",
+			"parameters": {
+				"undelegatorAddress": {
+					"type":        "string",
+					"description": "This is the delegator's address.",
+					"optional": true
+				},
+				"offset": {
+					"type":        "string",
+					"description": "This is an option for pagination. offset is a numeric offset that specifies the starting point of the result set. If left empty it will default to a value to be set by each app.",
+					"optional": true
+				},
+				"limit": {
+					"type":        "string",
+					"description": "This is an option for pagination. limit is the total number of results to be returned in the result page. If left empty it will default to a value to be set by each app.",
+					"optional": true
+				},
+				"countTotal": {
+					"type":        "string",
+					"description": "This is an option for pagination. count_total is set to true  to indicate that the result set should include a count of the total number of items available for pagination in UIs.",
+					"optional": true
+				}
+			},
+			"response": {
+				"undelegations": {
+					"type": "array",
+					"description": "The undelegations records info",
+					"fields": {
+						"validator_info": {
+							"type":        "struct",
+							"description": "The validator information",
+							"fields": {
+								"moniker": {
+									"type":        "string",
+									"description": "The validator's moniker"
+								},
+								"address": {
+									"type":        "string",
+									"description": "The validator's address"
+								},
+								"logo_url": {
+									"type":        "string",
+									"description": "The validator's logo"
+								},
+								"valkey": {
+									"type":        "string",
+									"description": "Validator’s valkey, required for MsgClaimUndelegation"
+								}
+							}
+						},
+						"tokens": {
+							"type": "array",
+							"description": "The token information",
+							"fields": {
+								"denom": {
+									"type": "string",
+									"description": "The token name"
+								},
+								"amount": {
+									"type": "number",
+									"description": "The token amount"
+								}
+							}
+						},
+						"expiry": {
+                            "type": "string",
+                            "description": "Epoch time value. After it passes, the tokens can be claimed"
+						},
+						"id": {
+                            "type": "number",
+                            "description": "Unique record marking, required for MsgClaimUndelegation"
+						}
+					}
+				},
+				"pagination": {
+					"description": "The pagination response information that includes total count"
+				}
+			}
+		}`,
+	)
+
+	AddInterxFunction(
+		"QueryDelegations",
+		config.QueryDelegations,
+		`{
+			"description": "QueryDelegations is a function to query all delegation records for a delegator.",
+			"parameters": {
+				"delegatorAddress": {
+					"type":        "string",
+					"description": "This is the delegator's address.",
+					"optional": true
+				},
+				"offset": {
+					"type":        "string",
+					"description": "This is an option for pagination. offset is a numeric offset that specifies the starting point of the result set. If left empty it will default to a value to be set by each app.",
+					"optional": true
+				},
+				"limit": {
+					"type":        "string",
+					"description": "This is an option for pagination. limit is the total number of results to be returned in the result page. If left empty it will default to a value to be set by each app.",
+					"optional": true
+				},
+				"countTotal": {
+					"type":        "string",
+					"description": "This is an option for pagination. count_total is set to true  to indicate that the result set should include a count of the total number of items available for pagination in UIs.",
+					"optional": true
+				}
+			},
+			"response": {
+				"delegations": {
+					"type": "array",
+					"description": "The delegations records info",
+					"fields": {
+						"validator_info": {
+							"type":        "struct",
+							"description": "The validator information",
+							"fields": {
+								"moniker": {
+									"type":        "string",
+									"description": "The validator's moniker"
+								},
+								"address": {
+									"type":        "string",
+									"description": "The validator's address"
+								},
+								"valkey": {
+									"type":        "string",
+									"description": "The validator's valoper address"
+								},
+								"website": {
+									"type":        "string",
+									"description": "The validator's official website"
+								},
+								"logo": {
+									"type":        "string",
+									"description": "The validator's logo"
+								}
+							}
+						},
+						"pool_info": {
+							"type":        "struct",
+							"description": "The pool information",
+							"fields": {
+								"id": {
+									"type": "number",
+									"description": "The pool id"
+								},
+								"commission": {
+									"type": "number",
+									"description": "The pool's commission rate"
+								},
+								"status": {
+									"type": "string",
+									"description": "The pool's status"
+								},
+								"tokens": {
+									"type": "array<string>",
+									"description": "list of token types available to stake in the pool"
+								}
+							}
+						}
+					}
+				},
+				"pagination": {
+					"description": "The pagination response information that includes total count"
 				}
 			}
 		}`,

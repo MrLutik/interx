@@ -1,4 +1,4 @@
 
 Features:
 
-* Optimize transactions endpoint
+* made sleep interval for snapshot checksum
