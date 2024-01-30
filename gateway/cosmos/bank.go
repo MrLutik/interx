@@ -144,7 +144,7 @@ func queryBalancesHandle(r *http.Request, gwCosmosmux *runtime.ServeMux) (interf
 	limitParam := r.URL.Query().Get("limit")
 	limit, err := strconv.Atoi(limitParam)
 	if err != nil {
-		limit = 5
+		limit = 100
 	}
 
 	lastIndex := offset + limit
