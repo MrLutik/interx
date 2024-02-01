@@ -128,11 +128,22 @@ func queryBalancesHandle(r *http.Request, gwCosmosmux *runtime.ServeMux) (interf
 		excludedMap[token] = true
 	}
 
-	excludedData := make([]types.Coin, 0)
+	filteredData := make([]types.Coin, 0)
 	for _, balance := range allBalances {
-		if !excludedMap[balance.Denom] {
-			excludedData = append(excludedData, balance)
+		denom := balance.Denom
+		if excludedMap[denom] {
+			continue
 		}
+
+		isDerivedDenom := len(denom) > 2 && denom[0] == 'v' && strings.Contains(denom, "/")
+		if derivedParam == "true" && !isDerivedDenom {
+			continue
+		}
+		if derivedParam == "false" && isDerivedDenom {
+			continue
+		}
+
+		filteredData = append(filteredData, balance)
 	}
 
 	// if request does not have tokens list, return with pagination
@@ -148,16 +159,16 @@ func queryBalancesHandle(r *http.Request, gwCosmosmux *runtime.ServeMux) (interf
 	}
 
 	lastIndex := offset + limit
-	if lastIndex > len(excludedData) {
-		lastIndex = len(excludedData)
+	if lastIndex > len(filteredData) {
+		lastIndex = len(filteredData)
 	}
-	data = excludedData[offset:lastIndex]
+	data = filteredData[offset:lastIndex]
 
 	result := BalancesResult{
 		Balances: data,
 		Pagination: &Pagination{
 			NextKey: lastIndex,
-			Total:   len(excludedData),
+			Total:   len(filteredData),
 		},
 	}
 
